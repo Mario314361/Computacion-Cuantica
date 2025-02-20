@@ -1,0 +1,127 @@
+# Importar librerías necesarias
+import cirq
+import numpy as np
+import matplotlib.pyplot as plt
+import multiprocessing
+import base64
+
+
+# Definir qubits
+q0 = cirq.GridQubit(0, 0)
+q1 = cirq.GridQubit(1, 0)
+
+
+# Crear circuito cuántico
+def crear_circuito():
+    circuito = cirq.Circuit(
+        cirq.H(q0),  # Aplicar Hadamard al primer qubit
+        cirq.CNOT(q0, q1),  # Aplicar CNOT para entrelazar
+        cirq.measure(q0, key='q0'),  # Medir el primer qubit
+        cirq.measure(q1, key='q1')   # Medir el segundo qubit
+    )
+    return circuito
+
+
+# Función para ejecutar la simulación
+def simular_circuito(repeticiones, use_parallel=False):
+    circuito = crear_circuito()
+    simulator = cirq.Simulator()
+
+
+    # Ejecutar en paralelo si se activa la opción
+    if use_parallel:
+        with multiprocessing.Pool() as pool:
+            resultados = pool.map(lambda _: simulator.run(circuito), range(repeticiones))
+    else:
+        resultados = [simulator.run(circuito) for _ in range(repeticiones)]
+
+
+    # Extraer las mediciones
+    mediciones = [r.data['q0'][0] * 2 + r.data['q1'][0] for r in resultados]
+    return mediciones
+
+
+# Función para generar la clave
+def generar_clave(mediciones, cantidad_numeros):
+    clave_binaria = ''.join(format(med, '02b') for med in mediciones)
+    longitud_clave = cantidad_numeros * 8  # 1 número decimal = 8 bits
+    clave_final_binaria = clave_binaria[:longitud_clave]
+   
+    # Convertir a decimal
+    bloques = [clave_final_binaria[i:i+8] for i in range(0, len(clave_final_binaria), 8)]
+    clave_decimal = [int(bloque, 2) for bloque in bloques]
+   
+    # Convertir a hexadecimal
+    clave_hexadecimal = ''.join(format(num, '02X') for num in clave_decimal)
+   
+    # Convertir a Base64
+    clave_bytes = bytes(clave_decimal)
+    clave_base64 = base64.b64encode(clave_bytes).decode()
+
+
+    return clave_final_binaria, clave_decimal, clave_hexadecimal, clave_base64
+
+
+# Función para graficar la distribución de bits
+def graficar_distribucion(mediciones):
+    etiquetas = ["00", "01", "10", "11"]
+    frecuencias = [mediciones.count(i) for i in range(4)]
+    total = sum(frecuencias)
+   
+    plt.figure(figsize=(6, 4))
+    bars = plt.bar(etiquetas, frecuencias, color=['blue', 'red', 'green', 'purple'], alpha=0.7, edgecolor='black')
+   
+    # Agregar valores en las barras
+    for bar, freq in zip(bars, frecuencias):
+        plt.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f"{(freq/total)*100:.2f}%", ha='center', va='bottom')
+   
+    plt.xlabel("Bits generados")
+    plt.ylabel("Frecuencia")
+    plt.title("Distribución de bits generados en la clave")
+    plt.show()
+
+
+# Función principal
+def main():
+    print("\n💡 Bienvenido al Generador de Claves Cuánticas 💡")
+   
+    # Pedir cantidad de números en la clave
+    while True:
+        try:
+            cantidad_numeros = int(input("\n🔢 ¿Cuántos números deseas en la clave? "))
+            if cantidad_numeros > 0:
+                break
+            else:
+                print("⚠️ Ingresa un número mayor a 0.")
+        except ValueError:
+            print("❌ Entrada no válida. Ingresa un número entero.")
+
+
+    # Pedir si desea usar procesamiento en paralelo
+    use_parallel = input("\n🚀 ¿Deseas acelerar la simulación con múltiples núcleos? (s/n): ").strip().lower() == 's'
+
+
+    # Ejecutar simulación
+    repeticiones = cantidad_numeros * 4  # Asegura suficientes bits
+    print("\n⏳ Generando clave cuántica...")
+    mediciones = simular_circuito(repeticiones, use_parallel)
+   
+    # Generar clave
+    clave_binaria, clave_decimal, clave_hexadecimal, clave_base64 = generar_clave(mediciones, cantidad_numeros)
+
+
+    # Mostrar resultados
+    print("\n🔑 Clave generada en diferentes formatos:")
+    print(f"🟢 Binario: {clave_binaria}")
+    print(f"🔵 Decimal: {clave_decimal}")
+    print(f"🟠 Hexadecimal: {clave_hexadecimal}")
+    print(f"🟣 Base64: {clave_base64}")
+
+
+    # Mostrar gráfica de distribución
+    graficar_distribucion(mediciones)
+
+
+# Ejecutar programa
+if __name__ == "__main__":
+    main()
